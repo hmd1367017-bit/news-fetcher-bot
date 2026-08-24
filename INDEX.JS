@@ -5,50 +5,56 @@ const cron = require('node-cron');
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
-const DISCORD_TOKEN = process.env.MTU0MTM5ODY4MDg0MDcwNDAyMA.GrV3oC.KkVmgS04tYDwetJOwAgqkUmmWbAVE7q7XHp3kM;
-const NEWS_API_KEY = process.env.21944bf4fb5a4dc1ac40b983337c01dd;
-const TARGET_CHANNEL_ID = '1541401479657554033';
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const NEWS_API_KEY = process.env.NEWS_API_KEY;
+
+// আপনার নির্দিষ্ট নিউজ চ্যানেলের আইডি
+const TARGET_CHANNEL_ID = '1541417079142617151';
 
 async function sendDailyNews() {
   try {
     const channel = await client.channels.fetch(TARGET_CHANNEL_ID);
     if (!channel) return console.log('Channel not found.');
 
-    const globalRes = await axios.get(
-      `https://newsapi.org/v2/top-headlines?language=en&pageSize=5&apiKey=${NEWS_API_KEY}`
+    // 1. Top 5 Asia News
+    const asiaRes = await axios.get(
+      `https://newsapi.org/v2/everything?q=Asia&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`
     );
 
+    // 2. Top 5 Bangladesh News
     const bdRes = await axios.get(
       `https://newsapi.org/v2/everything?q=Bangladesh&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`
     );
 
-    const globalArticles = globalRes.data.articles || [];
+    const asiaArticles = asiaRes.data.articles || [];
     const bdArticles = bdRes.data.articles || [];
 
-    let responseMessage = '📢 **Daily News Update (8:00 PM)**\n\n🌍 **Top 5 World News:**\n';
-    if (globalArticles.length > 0) {
-      globalArticles.forEach((art, idx) => {
-        responseMessage += `${idx + 1}. [${art.title}](${art.url})\n`;
+    let responseMessage = '📢 **Daily Morning News Update**\n\n🌏 **Top 5 Asia News:**\n';
+    
+    if (asiaArticles.length > 0) {
+      asiaArticles.forEach((art, idx) => {
+        responseMessage += `${idx + 1}. **${art.title}**\n${art.url}\n\n`;
       });
     } else {
-      responseMessage += 'No world news available at the moment.\n';
+      responseMessage += 'No Asia news available at the moment.\n\n';
     }
 
-    responseMessage += '\n🇧🇩 **Top 5 Bangladesh News:**\n';
+    responseMessage += '🇧🇩 **Top 5 Bangladesh News:**\n';
     if (bdArticles.length > 0) {
       bdArticles.forEach((art, idx) => {
-        responseMessage += `${idx + 1}. [${art.title}](${art.url})\n`;
+        responseMessage += `${idx + 1}. **${art.title}**\n${art.url}\n\n`;
       });
     } else {
-      responseMessage += 'No Bangladesh news available at the moment.\n';
+      responseMessage += 'No Bangladesh news available at the moment.\n\n';
     }
 
     await channel.send(responseMessage);
-    console.log('Daily news successfully sent to the channel.');
+    console.log('Morning news successfully sent.');
 
   } catch (error) {
     console.error('Error fetching or sending news:', error);
@@ -58,12 +64,21 @@ async function sendDailyNews() {
 client.once('ready', () => {
   console.log(`Bot connected as ${client.user.tag}`);
 
-  // Schedule task for 8:00 PM daily (Bangladesh Time)
-  cron.schedule('0 20 * * *', () => {
+  // প্রতিদিন সকাল ৭:০০ টায় অটোমেটিক নিউজ পাঠাবে
+  cron.schedule('0 7 * * *', () => {
     sendDailyNews();
   }, {
     timezone: "Asia/Dhaka"
   });
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  // শুধু নির্দিষ্ট চ্যানেলে !news লিখলে কাজ করবে
+  if (message.channel.id === TARGET_CHANNEL_ID && message.content.toLowerCase().includes('!news')) {
+    sendDailyNews();
+  }
 });
 
 client.login(DISCORD_TOKEN);const { Client, GatewayIntentBits } = require('discord.js');
@@ -73,50 +88,56 @@ const cron = require('node-cron');
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
-const TARGET_CHANNEL_ID = '1541401479657554033';
+
+// আপনার নির্দিষ্ট নিউজ চ্যানেলের আইডি
+const TARGET_CHANNEL_ID = '1541417079142617151';
 
 async function sendDailyNews() {
   try {
     const channel = await client.channels.fetch(TARGET_CHANNEL_ID);
     if (!channel) return console.log('Channel not found.');
 
-    const globalRes = await axios.get(
-      `https://newsapi.org/v2/top-headlines?language=en&pageSize=5&apiKey=${NEWS_API_KEY}`
+    // 1. Top 5 Asia News
+    const asiaRes = await axios.get(
+      `https://newsapi.org/v2/everything?q=Asia&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`
     );
 
+    // 2. Top 5 Bangladesh News
     const bdRes = await axios.get(
       `https://newsapi.org/v2/everything?q=Bangladesh&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`
     );
 
-    const globalArticles = globalRes.data.articles || [];
+    const asiaArticles = asiaRes.data.articles || [];
     const bdArticles = bdRes.data.articles || [];
 
-    let responseMessage = '📢 **Daily News Update (8:00 PM)**\n\n🌍 **Top 5 World News:**\n';
-    if (globalArticles.length > 0) {
-      globalArticles.forEach((art, idx) => {
-        responseMessage += `${idx + 1}. [${art.title}](${art.url})\n`;
+    let responseMessage = '📢 **Daily Morning News Update**\n\n🌏 **Top 5 Asia News:**\n';
+    
+    if (asiaArticles.length > 0) {
+      asiaArticles.forEach((art, idx) => {
+        responseMessage += `${idx + 1}. **${art.title}**\n${art.url}\n\n`;
       });
     } else {
-      responseMessage += 'No world news available at the moment.\n';
+      responseMessage += 'No Asia news available at the moment.\n\n';
     }
 
-    responseMessage += '\n🇧🇩 **Top 5 Bangladesh News:**\n';
+    responseMessage += '🇧🇩 **Top 5 Bangladesh News:**\n';
     if (bdArticles.length > 0) {
       bdArticles.forEach((art, idx) => {
-        responseMessage += `${idx + 1}. [${art.title}](${art.url})\n`;
+        responseMessage += `${idx + 1}. **${art.title}**\n${art.url}\n\n`;
       });
     } else {
-      responseMessage += 'No Bangladesh news available at the moment.\n';
+      responseMessage += 'No Bangladesh news available at the moment.\n\n';
     }
 
     await channel.send(responseMessage);
-    console.log('Daily news successfully sent to the channel.');
+    console.log('Morning news successfully sent.');
 
   } catch (error) {
     console.error('Error fetching or sending news:', error);
@@ -126,12 +147,21 @@ async function sendDailyNews() {
 client.once('ready', () => {
   console.log(`Bot connected as ${client.user.tag}`);
 
-  // Schedule task for 8:00 PM daily (Bangladesh Time)
-  cron.schedule('0 20 * * *', () => {
+  // প্রতিদিন সকাল ৭:০০ টায় অটোমেটিক নিউজ পাঠাবে
+  cron.schedule('0 7 * * *', () => {
     sendDailyNews();
   }, {
     timezone: "Asia/Dhaka"
   });
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  // শুধু নির্দিষ্ট চ্যানেলে !news লিখলে কাজ করবে
+  if (message.channel.id === TARGET_CHANNEL_ID && message.content.toLowerCase().includes('!news')) {
+    sendDailyNews();
+  }
 });
 
 client.login(DISCORD_TOKEN);
