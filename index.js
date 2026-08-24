@@ -81,3 +81,18 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(DISCORD_TOKEN);
+
+const express = require('express');
+const app = express();
+
+// Render Environment variable থেকে Port নেওয়া (ডিফল্ট 3000)
+const PORT = process.env.PORT || 3000;
+
+// Render-এর হেলথ চেকের জন্য रूट এন্ডপয়েন্ট
+app.get('/', (req, res) => {
+  res.send('Bot is running live!');
+});
+
+app.listen(PORT, () => {
+  console.log(`HTTP Server running on port ${PORT}`);
+});
