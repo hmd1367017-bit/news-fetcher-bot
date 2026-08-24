@@ -1,6 +1,5 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
-const cron = require('node-cron');
 
 const client = new Client({
   intents: [
@@ -16,10 +15,13 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY;
 // আপনার নির্দিষ্ট টেক্সট চ্যানেলের আইডি
 const TARGET_CHANNEL_ID = '1541417897914261751';
 
-async function sendDailyNews() {
+async function sendNewsAndExit() {
   try {
     const channel = await client.channels.fetch(TARGET_CHANNEL_ID);
-    if (!channel) return console.log('Channel not found.');
+    if (!channel) {
+      console.log('Channel not found.');
+      process.exit(1);
+    }
 
     // 1. Top 5 Asia News
     const asiaRes = await axios.get(
@@ -54,45 +56,20 @@ async function sendDailyNews() {
     }
 
     await channel.send(responseMessage);
-    console.log('Morning news successfully sent.');
+    console.log('News successfully sent. Exiting...');
+    
+    // নিউজ পাঠানো শেষ হলে বট বন্ধ হয়ে যাবে
+    process.exit(0);
   } catch (error) {
     console.error('Error fetching or sending news:', error);
+    process.exit(1);
   }
 }
 
 client.once('ready', () => {
   console.log(`Bot connected as ${client.user.tag}`);
-
-  // প্রতিদিন সকাল ৭:০০ টায় অটোমেটিক নিউজ পাঠাবে
-  cron.schedule('0 7 * * *', () => {
-    sendDailyNews();
-  }, {
-    timezone: "Asia/Dhaka"
-  });
-});
-
-client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
-
-  // শুধু নির্দিষ্ট চ্যানেলে !news লিখলে কাজ করবে
-  if (message.channel.id === TARGET_CHANNEL_ID && message.content.toLowerCase().includes('!news')) {
-    sendDailyNews();
-  }
+  // বট রান হওয়ার সাথে সাথেই নিউজ পাঠিয়ে বন্ধ হয়ে যাবে
+  sendNewsAndExit();
 });
 
 client.login(DISCORD_TOKEN);
-
-const express = require('express');
-const app = express();
-
-// Render Environment variable থেকে Port নেওয়া (ডিফল্ট 3000)
-const PORT = process.env.PORT || 3000;
-
-// Render-এর হেলথ চেকের জন্য रूट এন্ডপয়েন্ট
-app.get('/', (req, res) => {
-  res.send('Bot is running live!');
-});
-
-app.listen(PORT, () => {
-  console.log(`HTTP Server running on port ${PORT}`);
-});
