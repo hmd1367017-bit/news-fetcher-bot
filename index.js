@@ -22,7 +22,7 @@ const aiProviders = [
   {
     name: "OpenAI / Custom 1",
     type: "openai",
-    key: "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",
+    key: process.env.OPEN_AI,
     model: "gpt-4o-mini"
   },
   {
@@ -43,13 +43,13 @@ const aiProviders = [
   {
     name: "OpenRouter 1",
     type: "openrouter",
-    key: "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",
+    key: process.env.OPENROUTER_API_KEY,
     model: "inclusionai/ling-3.0-flash-sante:free"
   },
   {
     name: "OpenRouter 2",
     type: "openrouter",
-    key: "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",
+    key: process.env.OPENROUTER_API_KEY1,
     model: "poolside/laguna-s-2.1:free"
   }
 ];
