@@ -1,75 +1,133 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
+const { handleMention, handleVoiceCommand } = require('./commands');
+const { checkMessageModeration, handleModeration } = require('./moderation');
 
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.Guilds,           // ক্যাটাগরি ও চ্যানেল দেখতে পাওয়ার জন্য
+    GatewayIntentBits.GuildMessages,     // মেসেজ পড়ার জন্য
+    GatewayIntentBits.MessageContent,    // মেসেজের ভেতরের লেখা চেক করার জন্য
+    GatewayIntentBits.GuildVoiceStates   // ভয়েস চ্যানেলের জন্য
   ]
 });
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const NEWS_API_KEY = process.env.NEWS_API_KEY;
+const TARGET_CHANNEL_ID = process.env.GUILD_ID; // নির্দিষ্ট টার্গেট চ্যানেল আইডি
+const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
+const TARGET_LOG_CHANNEL_ID = process.env.TARGET_LOG_CHANNEL_ID;
 
-// আপনার নির্দিষ্ট টেক্সট চ্যানেলের আইডি
-const TARGET_CHANNEL_ID = '1541417897914261751';
-
-async function sendNewsAndExit() {
-  try {
-    const channel = await client.channels.fetch(TARGET_CHANNEL_ID);
-    if (!channel) {
-      console.log('Channel not found.');
-      process.exit(1);
-    }
-
-    // 1. Top 5 Asia News
-    const asiaRes = await axios.get(
-      `https://newsapi.org/v2/everything?q=Asia&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`
-    );
-
-    // 2. Top 5 Bangladesh News
-    const bdRes = await axios.get(
-      `https://newsapi.org/v2/everything?q=Bangladesh&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`
-    );
-
-    const asiaArticles = asiaRes.data.articles || [];
-    const bdArticles = bdRes.data.articles || [];
-
-    let responseMessage = "**Daily Morning News Update**\n\n";
-
-    if (asiaArticles.length > 0) {
-      asiaArticles.forEach((art, idx) => {
-        responseMessage += `${idx + 1}. **${art.title}**\n${art.url}\n\n`;
-      });
-    } else {
-      responseMessage += "No Asia news available at the moment.\n\n";
-    }
-
-    responseMessage += "**Top 5 Bangladesh News:**\n";
-    if (bdArticles.length > 0) {
-      bdArticles.forEach((art, idx) => {
-        responseMessage += `${idx + 1}. **${art.title}**\n${art.url}\n\n`;
-      });
-    } else {
-      responseMessage += "No Bangladesh news available at the moment.\n";
-    }
-
-    await channel.send(responseMessage);
-    console.log('News successfully sent. Exiting...');
-    
-    // নিউজ পাঠানো শেষ হলে বট বন্ধ হয়ে যাবে
-    process.exit(0);
-  } catch (error) {
-    console.error('Error fetching or sending news:', error);
-    process.exit(1);
+// আপনার দেওয়া সমস্ত এপিআই কিগুলোর লিস্ট (ফলওভার সিস্টেমের জন্য সাজানো)
+const aiProviders = [
+  {
+    name: "OpenAI / Custom 1",
+    type: "openai",
+    key: "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",
+    model: "gpt-4o-mini"
+  },
+  {
+    name: "Other Key 1",
+    type: "custom",
+    key: "AQ.Ab8RN6JNwU5klnWzagP_Up7gZLRnR5zHuwPqH9oSueWAWZEmCQ"
+  },
+  {
+    name: "Other Key 2",
+    type: "custom",
+    key: "RRTg1guPAqlZWbcSq8GQe8uQ4bsNpKo6wt2gHESk"
+  },
+  {
+    name: "Other Key 3",
+    type: "custom",
+    key: "sk-b5a9236c50634ed4815f523a96bb9c81"
+  },
+  {
+    name: "OpenRouter 1",
+    type: "openrouter",
+    key: "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",
+    model: "inclusionai/ling-3.0-flash-sante:free"
+  },
+  {
+    name: "OpenRouter 2",
+    type: "openrouter",
+    key: "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",
+    model: "poolside/laguna-s-2.1:free"
   }
+];
+
+// এআই হ্যান্ডলার (মডারেশন এবং চ্যাট উভয়ের জন্য)
+async function checkMessageWithAI(promptText, isChat = false) {
+  for (let provider of aiProviders) {
+    try {
+      console.log(`Trying with ${provider.name}...`);
+
+      // শুধু OpenRouter এবং OpenAI প্রোভাইডার হ্যান্ডেল করার জন্য
+      if (provider.type === "openrouter" || provider.type === "openai") {
+        const apiUrl = provider.type === "openrouter" 
+          ? 'https://openrouter.ai/api/v1/chat/completions' 
+          : 'https://api.openai.com/v1/chat/completions';
+
+        const systemPrompt = isChat 
+          ? "You are 'BD E-SPORTS ORG', a helpful, friendly, and smart Discord bot assistant in a gaming server. Always reply in Bengali naturally." 
+          : "You are a strict Discord server moderator bot named 'BD E-SPORTS ORG'. Analyze if the given message is toxic, abusive, or harmful. If it's a minor insult or bad word, reply with 'WARN'. If it's heavily abusive, toxic, or spam, reply with 'KICK' or 'BAN'. Otherwise, reply with 'SAFE'. Reply with ONLY one word: WARN, KICK, BAN, or SAFE.";
+
+        const response = await axios.post(
+          apiUrl,
+          {
+            model: provider.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: promptText }
+            ]
+          },
+          { headers: { 'Authorization': `Bearer ${provider.key}` } }
+        );
+
+        const reply = response.data.choices[0].message.content.trim().toUpperCase();
+        if (isChat) return response.data.choices[0].message.content.trim();
+        return reply;
+      }
+    } catch (error) {
+      console.warn(`${provider.name} failed. Switching to next API key...`);
+    }
+  }
+  return isChat ? "দুঃখিত, এই মুহূর্তে আমার এআই ব্রেন কাজ করছে না।" : "SAFE";
 }
 
 client.once('ready', () => {
   console.log(`Bot connected as ${client.user.tag}`);
-  // বট রান হওয়ার সাথে সাথেই নিউজ পাঠিয়ে বন্ধ হয়ে যাবে
-  sendNewsAndExit();
+  console.log('Log Channel ID set to:', LOG_CHANNEL_ID);
+  console.log('Multi-API Failover, Voice & Advanced AI Moderation active!');
+});
+
+// মেসেজ ইভেন্ট হ্যান্ডলার
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  const content = message.content.trim();
+
+  // ১. যদি মেসেজটি '!' দিয়ে শুরু হয়, তবে সেটি ভয়েস কমান্ড
+  if (content.startsWith('!')) {
+    await handleVoiceCommand(message);
+    return;
+  }
+
+  // ২. শুধু বটের নিজস্ব আইডি মেনশন করা হয়েছে কি না তা নিখুঁতভাবে চেক করা 
+  const isBotMentioned = message.mentions.users.has(client.user.id) && !message.mentions.everyone;
+
+  if (isBotMentioned) {
+    await handleMention(message, checkMessageWithAI);
+    return;
+  }
+
+  // ৩. অটো মডারেশন লজিক (যে কোডটি আপনি জানতে চেয়েছেন সেটি এখানে বসবে)
+  try {
+    const moderationResult = await checkMessageModeration(content, aiProviders, axios);
+    if (moderationResult !== "SAFE") {
+      await handleModeration(message, moderationResult);
+    }
+  } catch (error) {
+    console.error('Moderation check error:', error);
+  }
 });
 
 client.login(DISCORD_TOKEN);
